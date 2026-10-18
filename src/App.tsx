@@ -8,11 +8,38 @@ import { MobileNavDrawer } from './components/MobileNavDrawer';
 import { SupportModal } from './components/SupportModal';
 import { AccountManagerModal } from './components/AccountManagerModal';
 import { WebPlayerDemo } from './components/WebPlayerDemo';
+import { SoundFlowVersionB } from './components/SoundFlowVersionB';
+import { VersionSwitcher } from './components/VersionSwitcher';
 
 export default function App() {
+  const [currentVersion, setCurrentVersion] = useState<'A' | 'B'>(() => {
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const v = urlParams.get('v');
+      if (v === 'b' || v === 'B') return 'B';
+      const saved = localStorage.getItem('soundflow_version');
+      if (saved === 'B') return 'B';
+    } catch {
+      // Ignore
+    }
+    return 'A';
+  });
+
   const [currentScreen, setCurrentScreen] = useState<'landing' | 'player'>('landing');
   const [currentRegion, setCurrentRegion] = useState<RegionConfig>(SUPPORTED_REGIONS[0]);
   const [subscription, setSubscription] = useState<UserSubscription | null>(null);
+
+  const handleSwitchVersion = (version: 'A' | 'B') => {
+    setCurrentVersion(version);
+    try {
+      localStorage.setItem('soundflow_version', version);
+      const url = new URL(window.location.href);
+      url.searchParams.set('v', version.toLowerCase());
+      window.history.pushState({}, '', url.toString());
+    } catch {
+      // Ignore
+    }
+  };
 
   // Modal open states
   const [selectedPlanForCheckout, setSelectedPlanForCheckout] = useState<PlanConfig | null>(null);
@@ -126,12 +153,30 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#121212] text-white">
+      {/* Top Behavioral Study Version Switcher Bar */}
+      <VersionSwitcher 
+        currentVersion={currentVersion} 
+        onSwitchVersion={handleSwitchVersion} 
+      />
+
       {/* View routing: Landing or Web Player */}
       {currentScreen === 'player' ? (
         <WebPlayerDemo
           subscription={subscription}
           onBackToLanding={() => setCurrentScreen('landing')}
           onOpenCheckout={() => setSelectedPlanForCheckout(allPlans[0])}
+        />
+      ) : currentVersion === 'B' ? (
+        <SoundFlowVersionB
+          region={currentRegion}
+          subscription={subscription}
+          onOpenCheckout={(plan) => setSelectedPlanForCheckout(plan)}
+          onOpenStudent={() => setIsStudentModalOpen(true)}
+          onOpenRegion={() => setIsRegionModalOpen(true)}
+          onOpenSupport={() => setIsSupportModalOpen(true)}
+          onOpenMenu={() => setIsMobileNavOpen(true)}
+          onOpenWebPlayer={() => setCurrentScreen('player')}
+          onOpenAccount={() => setIsAccountModalOpen(true)}
         />
       ) : (
         <SoundFlowLanding

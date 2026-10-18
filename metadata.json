@@ -2,5 +2,7 @@
   "name": "SoundFlow Premium",
   "description": "SoundFlow Premium - Listen without limits. Try 1 month of Premium Individual for $0, ad-free music, lossless audio, and offline downloads.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }
