@@ -10,35 +10,89 @@ import { AccountManagerModal } from './components/AccountManagerModal';
 import { WebPlayerDemo } from './components/WebPlayerDemo';
 import { SoundFlowVersionB } from './components/SoundFlowVersionB';
 import { VersionSwitcher } from './components/VersionSwitcher';
+import { AcademicDisclosure } from './components/AcademicDisclosure';
+
+const EXPERIMENT_STORAGE_KEY = 'soundflow_assigned_variant';
+
+function determineInitialVariant(): { variant: 'A' | 'B'; isPreview: boolean } {
+  if (typeof window === 'undefined') return { variant: 'A', isPreview: false };
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const isPreview = urlParams.get('preview') === '1' || urlParams.get('preview') === 'true';
+
+  // Evaluator-only preview mode: allows explicit version inspection via ?preview=1&v=a or ?preview=1&v=b
+  if (isPreview) {
+    const vParam = urlParams.get('v');
+    if (vParam === 'b' || vParam === 'B') return { variant: 'B', isPreview: true };
+    if (vParam === 'a' || vParam === 'A') return { variant: 'A', isPreview: true };
+
+    const saved = localStorage.getItem(EXPERIMENT_STORAGE_KEY);
+    if (saved === 'A' || saved === 'B') {
+      return { variant: saved, isPreview: true };
+    }
+    return { variant: 'A', isPreview: true };
+  }
+
+  // Normal Visitor Mode:
+  // 1. Check persistent browser storage
+  try {
+    const saved = localStorage.getItem(EXPERIMENT_STORAGE_KEY);
+    if (saved === 'A' || saved === 'B') {
+      return { variant: saved, isPreview: false };
+    }
+
+    // 2. First-time visitor: 50/50 probability automatic random assignment
+    const assigned: 'A' | 'B' = Math.random() < 0.5 ? 'A' : 'B';
+    localStorage.setItem(EXPERIMENT_STORAGE_KEY, assigned);
+    return { variant: assigned, isPreview: false };
+  } catch {
+    const fallback: 'A' | 'B' = Math.random() < 0.5 ? 'A' : 'B';
+    return { variant: fallback, isPreview: false };
+  }
+}
 
 export default function App() {
-  const [currentVersion, setCurrentVersion] = useState<'A' | 'B'>(() => {
-    try {
-      const urlParams = new URLSearchParams(window.location.search);
-      const v = urlParams.get('v');
-      if (v === 'b' || v === 'B') return 'B';
-      const saved = localStorage.getItem('soundflow_version');
-      if (saved === 'B') return 'B';
-    } catch {
-      // Ignore
-    }
-    return 'A';
-  });
+  const [experimentState, setExperimentState] = useState(determineInitialVariant);
+  const currentVersion = experimentState.variant;
+  const isPreviewMode = experimentState.isPreview;
 
   const [currentScreen, setCurrentScreen] = useState<'landing' | 'player'>('landing');
   const [currentRegion, setCurrentRegion] = useState<RegionConfig>(SUPPORTED_REGIONS[0]);
   const [subscription, setSubscription] = useState<UserSubscription | null>(null);
 
+  // Evaluator-only switch handler (only active when preview=1)
   const handleSwitchVersion = (version: 'A' | 'B') => {
-    setCurrentVersion(version);
+    setExperimentState({ variant: version, isPreview: true });
     try {
-      localStorage.setItem('soundflow_version', version);
+      localStorage.setItem(EXPERIMENT_STORAGE_KEY, version);
       const url = new URL(window.location.href);
+      url.searchParams.set('preview', '1');
       url.searchParams.set('v', version.toLowerCase());
       window.history.pushState({}, '', url.toString());
     } catch {
       // Ignore
     }
+  };
+
+  // Reset 50/50 randomization in preview mode to test fresh visitor assignment
+  const handleResetRandomization = () => {
+    try {
+      localStorage.removeItem(EXPERIMENT_STORAGE_KEY);
+      const freshVariant: 'A' | 'B' = Math.random() < 0.5 ? 'A' : 'B';
+      localStorage.setItem(EXPERIMENT_STORAGE_KEY, freshVariant);
+      setExperimentState({ variant: freshVariant, isPreview: true });
+    } catch {
+      // Ignore
+    }
+  };
+
+  // Exit preview mode and return to normal visitor experience
+  const handleExitPreview = () => {
+    const url = new URL(window.location.href);
+    url.searchParams.delete('preview');
+    url.searchParams.delete('v');
+    window.history.pushState({}, '', url.pathname + (url.search ? url.search : ''));
+    setExperimentState(prev => ({ ...prev, isPreview: false }));
   };
 
   // Modal open states
@@ -153,11 +207,18 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#121212] text-white">
-      {/* Top Behavioral Study Version Switcher Bar */}
-      <VersionSwitcher 
-        currentVersion={currentVersion} 
-        onSwitchVersion={handleSwitchVersion} 
-      />
+      {/* Evaluator-Only Preview Mode Bar: Visible strictly when ?preview=1 is in the URL */}
+      {isPreviewMode && (
+        <VersionSwitcher 
+          currentVersion={currentVersion} 
+          onSwitchVersion={handleSwitchVersion} 
+          onResetRandomization={handleResetRandomization}
+          onExitPreview={handleExitPreview}
+        />
+      )}
+
+      {/* Neutral Academic Project Disclosure Notice: Displayed on both Version A & B */}
+      <AcademicDisclosure />
 
       {/* View routing: Landing or Web Player */}
       {currentScreen === 'player' ? (
@@ -170,6 +231,7 @@ export default function App() {
         <SoundFlowVersionB
           region={currentRegion}
           subscription={subscription}
+          isPreview={isPreviewMode}
           onOpenCheckout={(plan) => setSelectedPlanForCheckout(plan)}
           onOpenStudent={() => setIsStudentModalOpen(true)}
           onOpenRegion={() => setIsRegionModalOpen(true)}

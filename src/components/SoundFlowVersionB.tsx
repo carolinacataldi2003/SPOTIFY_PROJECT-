@@ -9,6 +9,7 @@ import {
 interface SoundFlowVersionBProps {
   region: RegionConfig;
   subscription: UserSubscription | null;
+  isPreview?: boolean;
   onOpenCheckout: (plan: PlanConfig) => void;
   onOpenStudent: () => void;
   onOpenRegion: () => void;
@@ -21,6 +22,7 @@ interface SoundFlowVersionBProps {
 export const SoundFlowVersionB: React.FC<SoundFlowVersionBProps> = ({
   region,
   subscription,
+  isPreview = false,
   onOpenCheckout,
   onOpenStudent,
   onOpenRegion,
@@ -232,7 +234,9 @@ export const SoundFlowVersionB: React.FC<SoundFlowVersionBProps> = ({
           </div>
           <div>
             <span className="font-extrabold text-xl tracking-tight text-white block leading-none">SoundFlow</span>
-            <span className="text-[10px] text-slate-400 font-medium">Subscription Guide · Version B</span>
+            <span className="text-[10px] text-slate-400 font-medium">
+              Subscription Guide{isPreview ? ' · Version B' : ''}
+            </span>
           </div>
         </a>
 
@@ -785,7 +789,7 @@ export const SoundFlowVersionB: React.FC<SoundFlowVersionBProps> = ({
           </div>
 
           <p className="text-[11px] text-slate-500">
-            Version B · Behavioral Choice Architecture Study
+            {isPreview ? 'Version B · Behavioral Choice Architecture Study' : '© 2026 SoundFlow AB'}
           </p>
         </div>
       </footer>
